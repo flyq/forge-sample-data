@@ -1,11 +1,14 @@
 import json
 import sys
 import time
+import os
 
 import requests  # pip install requests
 
 # NOTE: Provide your API Key here
-api_key = ""
+api_key = os.getenv("SINDRI_API_KEY", default=None)
+
+print("api key:", api_key)
 
 API_VERSION = "v1"
 API_URL = f"https://forge.sindri.app/api/{API_VERSION}/"
@@ -23,13 +26,19 @@ print("1. Creating circuit...")
 response = requests.post(
     API_URL + "circuit/create" + api_key_querystring,
     headers=headers_json,
-    data={"circuit_name": "multiplier_example", "circuit_type": "Circom C Groth16 bn254"},
+    data={
+        "circuit_name": "andN example",
+        "circuit_type": "Circom C Groth16 bn254",
+    },
 )
-assert response.status_code == 201, f"Expected status code 201, received {response.status_code}."
+assert (
+    response.status_code == 201
+), f"Expected status code 201, received {response.status_code}."
 circuit_id = response.json().get("circuit_id")  # Obtain circuit_id
+print("response: ", response.json())
 
 # Load the circuit .tar.gz file
-files = {"files": open("../circom/multiplier2.tar.gz", "rb")}
+files = {"files": open("./andN.tar.gz", "rb")}
 
 # Upload the circuit file
 response = requests.post(
@@ -37,13 +46,18 @@ response = requests.post(
     headers=headers_multipart,
     files=files,
 )
-assert response.status_code == 201, f"Expected status code 201, received {response.status_code}."
+assert (
+    response.status_code == 201
+), f"Expected status code 201, received {response.status_code}."
 
 # Initiate circuit compilation
 response = requests.post(
-    API_URL + f"circuit/{circuit_id}/compile" + api_key_querystring, headers=headers_json
+    API_URL + f"circuit/{circuit_id}/compile" + api_key_querystring,
+    headers=headers_json,
 )
-assert response.status_code == 201, f"Expected status code 201, received {response.status_code}."
+assert (
+    response.status_code == 201
+), f"Expected status code 201, received {response.status_code}."
 
 # Poll circuit detail unitl it has a status of Ready or Failed
 TIMEOUT = 600  # timeout after 10 minutes
@@ -72,7 +86,7 @@ else:
 
 # Initiate proof generation
 print("2. Proving circuit...")
-proof_input = json.dumps({"a": "7", "b": "42"})
+proof_input = json.dumps({"in": ["1", "1", "1", "1", "1", "1", "1", "1"]})
 response = requests.post(
     API_URL + f"circuit/{circuit_id}/prove" + api_key_querystring,
     headers=headers_urlencode,
@@ -80,7 +94,9 @@ response = requests.post(
         "proof_input": proof_input,
     },
 )
-assert response.status_code == 201, f"Expected status code 201, received {response.status_code}."
+assert (
+    response.status_code == 201
+), f"Expected status code 201, received {response.status_code}."
 proof_id = response.json()["proof_id"]  # Obtain proof_id
 
 # Poll proof detail unitl it has a status of Ready or Failed
@@ -120,7 +136,9 @@ print("3. Verifing proof...")
 response = requests.get(
     API_URL + f"proof/{proof_id}/verify" + api_key_querystring, headers=headers_json
 )
-assert response.status_code == 200, f"Expected status code 200, received {response.status_code}."
+assert (
+    response.status_code == 200
+), f"Expected status code 200, received {response.status_code}."
 valid_proof = response.json()["success"]  # boolean
 if valid_proof:
     print("Proof was valid")
